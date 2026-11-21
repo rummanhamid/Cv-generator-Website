@@ -28,6 +28,10 @@ import { generateDocxBlob } from '../services/generateDocx';
 import { createClientId, loadCV, saveCV, submitClient } from '../services/submitClient';
 import { normalizeFormData, TOTAL_STEPS } from '../types/form';
 import type { FormStep } from '../types/form';
+import { logError } from '../utils/logger';
+import { checkRateLimit } from '../utils/security';
+
+const AUTOSAVE_FORM_KEY = 'autosave-submission';
 
 const steps = [
   { number: 1, label: 'Personal Data', component: Step1PersonalData },
@@ -161,6 +165,17 @@ const FormPageInner: React.FC = () => {
       setCloudStatus('Saving to My CVs...');
       const targetSnapshot = latestSnapshotRef.current;
       const scope = scopeRef.current;
+
+      // Rate limit auto-save: max 1 save per 5 seconds
+      const autoSaveRateLimit = checkRateLimit(AUTOSAVE_FORM_KEY, 1, 5_000);
+      if (!autoSaveRateLimit.allowed) {
+        if (scope === scopeRef.current) {
+          busyRef.current = false;
+          setAutoSaving(false);
+        }
+        return;
+      }
+
       cloudDocIdRef.current ??= createClientId();
       try {
         await saveCV(
@@ -275,7 +290,7 @@ const FormPageInner: React.FC = () => {
       a.click();
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('DOCX generation failed:', error);
+      logError('DOCX generation failed', error);
     } finally {
       downloadingRef.current = false;
       setDownloadingDocx(false);

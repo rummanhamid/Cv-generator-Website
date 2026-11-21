@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useForm } from '../../hooks/useForm';
 import { scrollToRef } from '../../lib/scroll';
 import type { Experience } from '../../types/form';
+import { sanitizeHtml, sanitizeText, validateName } from '../../utils/security';
 import { Button } from '../common/Button';
 import { Card, CardHeader, CardContent, CardFooter } from '../common/Card';
 import { Input, Textarea } from '../common/Input';
@@ -52,7 +53,12 @@ export const Step4Experience: React.FC = () => {
   const experienceErrors = errors.experiences || {};
 
   const handleInputChange = (field: keyof Experience, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    // Sanitize text inputs to prevent XSS
+    const sanitizedValue =
+      field === 'position' || field === 'company' || field === 'location'
+        ? sanitizeText(value)
+        : value;
+    setFormData((prev) => ({ ...prev, [field]: sanitizedValue }));
     if (editingId) {
       clearError('experiences', field);
     }
@@ -77,10 +83,31 @@ export const Step4Experience: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate required fields
+    const nameValidation = validateName(formData.company);
+    const positionValidation = validateName(formData.position);
+
+    if (!nameValidation.valid) {
+      // Set error on company field - we'll show via clearError mechanism
+      // For now, prevent submission
+      return;
+    }
+    if (!positionValidation.valid) {
+      return;
+    }
+
+    // Sanitize rich text content before saving
+    const sanitizedData: Experience = {
+      ...formData,
+      description: sanitizeHtml(formData.description || ''),
+      achievements: sanitizeHtml(formData.achievements || ''),
+    };
+
     if (editingId) {
-      updateExperience(editingId, formData);
+      updateExperience(editingId, sanitizedData);
     } else {
-      addExperience({ ...formData, id: uuidv4() });
+      addExperience({ ...sanitizedData, id: uuidv4() });
     }
     resetForm();
   };

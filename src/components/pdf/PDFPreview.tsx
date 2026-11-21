@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { TemplateId } from '../../hooks/useTemplate';
 import { generateDocxBlob } from '../../services/generateDocx';
 import type { FormState } from '../../types/form';
+import { logError } from '../../utils/logger';
 import { Button } from '../common/Button';
 
 import CVTemplate from './CVTemplate';
@@ -81,7 +82,7 @@ export const PDFPreview: React.FC<PDFPreviewProps> = ({
         setPdfBlob(blob);
       }
     } catch (err) {
-      console.error('PDF generation failed:', err);
+      logError('PDF generation failed', err);
       if (mountedRef.current) {
         setError(err instanceof Error ? err.message : 'Failed to generate PDF');
       }
@@ -129,7 +130,7 @@ export const PDFPreview: React.FC<PDFPreviewProps> = ({
       const blob = await generateDocxBlob(formState.data);
       triggerDownload(blob, `${safeFileName}.docx`);
     } catch (err) {
-      console.error('DOCX generation failed:', err);
+      logError('DOCX generation failed', err);
     } finally {
       setDownloadingDocx(false);
     }

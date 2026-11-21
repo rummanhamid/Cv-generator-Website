@@ -3,6 +3,20 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { db } from '../lib/firebase';
+import { logError } from '../utils/logger';
+import {
+  checkRateLimit,
+  isSubmissionAllowed,
+  recordFormSubmission,
+  sanitizeEmail,
+  sanitizeMessage,
+  sanitizeName,
+  validateEmail,
+  validateMessage,
+  validateName,
+} from '../utils/security';
+
+const CONTACT_FORM_KEY = 'contact-form-submission';
 
 export const ContactPage: React.FC = () => {
   const [submitted, setSubmitted] = useState(false);
@@ -11,22 +25,65 @@ export const ContactPage: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
+  const [rateLimitMsg, setRateLimitMsg] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setRateLimitMsg(null);
+
+    // Cooldown guard against double-submits / rapid repeated clicks
+    if (!isSubmissionAllowed(CONTACT_FORM_KEY)) {
+      setLoading(false);
+      setRateLimitMsg('Please wait a moment before sending another message.');
+      return;
+    }
+
+    // Rate limiting check
+    const rateLimit = checkRateLimit(CONTACT_FORM_KEY, 3, 60_000); // 3 per minute
+    if (!rateLimit.allowed) {
+      setLoading(false);
+      setRateLimitMsg(
+        `Too many submissions. Please wait ${Math.ceil(
+          (rateLimit.resetTime - Date.now()) / 1000
+        )} seconds before trying again.`
+      );
+      return;
+    }
+
+    // Validate and sanitize inputs
+    const nameValidation = validateName(name);
+    const emailValidation = validateEmail(email);
+    const messageValidation = validateMessage(message);
+
+    if (!nameValidation.valid || !emailValidation.valid || !messageValidation.valid) {
+      setLoading(false);
+      const allErrors = [
+        ...nameValidation.errors,
+        ...emailValidation.errors,
+        ...messageValidation.errors,
+      ];
+      setError(allErrors.join(' '));
+      return;
+    }
+
+    const sanitizedName = sanitizeName(name) || '';
+    const sanitizedEmail = sanitizeEmail(email) || '';
+    const sanitizedMessage = sanitizeMessage(message) || '';
+
     try {
       await addDoc(collection(db, 'contact-messages'), {
-        name,
-        email,
-        message,
+        name: sanitizedName,
+        email: sanitizedEmail,
+        message: sanitizedMessage,
         createdAt: serverTimestamp(),
         read: false,
       });
+      recordFormSubmission(CONTACT_FORM_KEY, 5_000); // 5s cooldown between submissions
       setSubmitted(true);
     } catch (err) {
-      console.error('Failed to send message:', err);
+      logError('Failed to send contact message', err);
       setError('Failed to send message. Please try again.');
     } finally {
       setLoading(false);
@@ -76,6 +133,11 @@ export const ContactPage: React.FC = () => {
                 {error}
               </div>
             )}
+            {rateLimitMsg && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
+                {rateLimitMsg}
+              </div>
+            )}
             <div>
               <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
                 Name
@@ -85,7 +147,7 @@ export const ContactPage: React.FC = () => {
                 required
                 maxLength={120}
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => setName(sanitizeName(e.target.value) || e.target.value)}
                 className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
                 placeholder="Your name"
               />
@@ -99,7 +161,7 @@ export const ContactPage: React.FC = () => {
                 required
                 maxLength={200}
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => setEmail(sanitizeEmail(e.target.value) || e.target.value)}
                 className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
                 placeholder="your@email.com"
               />
@@ -113,7 +175,7 @@ export const ContactPage: React.FC = () => {
                 required
                 maxLength={2000}
                 value={message}
-                onChange={(e) => setMessage(e.target.value)}
+                onChange={(e) => setMessage(sanitizeMessage(e.target.value) || e.target.value)}
                 className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
                 placeholder="How can we help you?"
               />

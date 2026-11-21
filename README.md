@@ -112,6 +112,27 @@ Things that will bite you:
 - **`src/services/submitClient.tsx` is `.tsx` but contains no JSX.**
 - **PDF filenames** are now derived from the candidate's name; DOCX always was.
 
+## Security
+
+Code-level hardening in place:
+
+- **XSS**: Rich-text HTML is sanitized with DOMPurify before storage/render (`src/utils/security.ts`); plain text is escaped; URLs are restricted to `http(s):` and relative paths.
+- **Security headers**: `vercel.json` sets CSP, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, and `Strict-Transport-Security`.
+- **Auth/session**: Firebase Auth handles password hashing. `sessionStorage['cv-form-data']` is cleared on logout.
+- **Rate limiting (client-side, best-effort)**: Contact form (3/min + 5s cooldown), login (5/min), autosave (1/5s). Not a substitute for server-side limits.
+- **Production logging**: `src/utils/logger.ts` suppresses error/warn/info/debug output in production builds.
+- **Firestore rules**: Hardened in `firestore.rules` (owner checks, contact-message validation, admin email requires `email_verified`, no userId reassignment). **Merged but not deployed** — run `firebase deploy --only firestore:rules`.
+- **Storage rules**: `storage.rules` requires admin `email_verified`; Firebase Storage is not initialized by the app.
+- **Secrets**: `.env`/tooling dirs gitignored; no secrets found in git history. Firebase `VITE_FIREBASE_*` config is public by design — protection relies on Firestore rules and Firebase App Check.
+
+**Requires your action in dashboards (I cannot do these):**
+
+- Deploy Firestore rules: `firebase deploy --only firestore:rules` and verify cloud save, `/my-cvs`, `/admin`, and contact form.
+- Enable **Firebase App Check** to protect client API keys from unauthorized origins.
+- Add **server-side rate limiting/CAPTCHA** for contact form (Cloud Function, reCAPTCHA, or edge middleware).
+- Review Firebase Auth settings (email enumeration protection, MFA for admin, authorized domains).
+- Enable monitoring/alerts in Firebase and Vercel.
+
 ## Known limitations
 
 - Validation blocks advancing a step and now explains why, but **per-field error highlighting is not wired up** — `setErrors` exists in the reducer and is still never called, so the `error` props on individual inputs remain `undefined`.
@@ -121,4 +142,4 @@ Things that will bite you:
 - The rich-text editor does not sync external changes to its `value` — a cloud resume will not repopulate an already-mounted editor.
 - Images embedded via the rich-text toolbar have no size cap, unlike the Step 1 profile photo (2 MB). Base64 images can exceed the `sessionStorage` quota, where the write failure is silent.
 - `/admin` is reachable by any signed-in user at the router level; enforcement is by Firestore rules only.
-- Contact messages are unauthenticated writes (shape- and size-validated, but no captcha or rate limit).
+- Contact messages are unauthenticated writes (shape- and size-validated). Client-side rate limiting is best-effort only; there is no CAPTCHA or server-side rate limit.

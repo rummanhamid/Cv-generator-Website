@@ -6,6 +6,7 @@ import { Card, CardContent } from '../components/common/Card';
 import { Input } from '../components/common/Input';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../lib/firebase';
+import { logError } from '../utils/logger';
 
 interface ClientRecord {
   id: string;
@@ -57,7 +58,7 @@ export const AdminPage: React.FC = () => {
       });
       setClients(records);
     } catch (err) {
-      console.error('Failed to fetch clients:', err);
+      logError('Failed to fetch clients', err);
       setError(err instanceof Error ? err.message : 'Failed to load clients');
     }
   }, []);
@@ -78,7 +79,7 @@ export const AdminPage: React.FC = () => {
       });
       setMessages(records);
     } catch (err) {
-      console.error('Failed to fetch messages:', err);
+      logError('Failed to fetch messages', err);
       setError(err instanceof Error ? err.message : 'Failed to load messages');
     }
   }, []);

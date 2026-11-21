@@ -9,6 +9,7 @@ import type { TemplateId } from '../hooks/useTemplate';
 import { getUserCVs, deleteCV } from '../services/submitClient';
 import type { SavedCV } from '../services/submitClient';
 import { initialFormState } from '../types/form';
+import { logError } from '../utils/logger';
 
 const TEMPLATE_LABELS: Record<TemplateId, string> = {
   classic: 'Classic',
@@ -48,7 +49,7 @@ const SavedCVList: React.FC<{ userId: string }> = ({ userId }) => {
         }
       })
       .catch((err) => {
-        console.error('Error fetching CVs:', err);
+        logError('Error fetching CVs', err);
         if (!cancelled) {
           setError('Failed to load your CVs. Please try again.');
           setLoading(false);
@@ -100,7 +101,7 @@ const SavedCVList: React.FC<{ userId: string }> = ({ userId }) => {
         await deleteCV(userId, cvId);
         setCVs((prev) => prev.filter((cv) => cv.id !== cvId));
       } catch (err) {
-        console.error('Error deleting CV:', err);
+        logError('Error deleting CV', err);
         alert('Failed to delete CV. Please try again.');
       }
     },

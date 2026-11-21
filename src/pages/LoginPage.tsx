@@ -5,6 +5,10 @@ import { Button } from '../components/common/Button';
 import { Card } from '../components/common/Card';
 import { Input } from '../components/common/Input';
 import { useAuth } from '../contexts/AuthContext';
+import { logError } from '../utils/logger';
+import { checkRateLimit, sanitizeEmail, validateEmail } from '../utils/security';
+
+const LOGIN_FORM_KEY = 'login-form-submission';
 
 export const LoginPage: React.FC = () => {
   const { signIn } = useAuth();
@@ -13,16 +17,41 @@ export const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [rateLimitMsg, setRateLimitMsg] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setRateLimitMsg(null);
     setSubmitting(true);
+
+    // Rate limiting: max 5 login attempts per minute per form
+    const rateLimit = checkRateLimit(LOGIN_FORM_KEY, 5, 60_000);
+    if (!rateLimit.allowed) {
+      setSubmitting(false);
+      setRateLimitMsg(
+        `Too many login attempts. Please wait ${Math.ceil(
+          (rateLimit.resetTime - Date.now()) / 1000
+        )} seconds before trying again.`
+      );
+      return;
+    }
+
+    // Validate email format
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.valid) {
+      setSubmitting(false);
+      setError(emailValidation.errors.join(' '));
+      return;
+    }
+
+    const sanitizedEmail = sanitizeEmail(email) || email;
+
     try {
-      await signIn(email, password);
+      await signIn(sanitizedEmail, password);
       navigate('/admin', { replace: true });
     } catch (err) {
-      console.error('Login failed:', err);
+      logError('Login failed', err);
       if (
         err instanceof Error &&
         (err.message.includes('auth/invalid-credential') ||
@@ -60,6 +89,11 @@ export const LoginPage: React.FC = () => {
             {error && (
               <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
                 {error}
+              </div>
+            )}
+            {rateLimitMsg && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
+                {rateLimitMsg}
               </div>
             )}
 

@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useForm } from '../../hooks/useForm';
 import { scrollToRef } from '../../lib/scroll';
 import type { Project } from '../../types/form';
+import { sanitizeHtml, sanitizeText, sanitizeUrl, validateName } from '../../utils/security';
 import { Button } from '../common/Button';
 import { Card, CardHeader, CardContent, CardFooter } from '../common/Card';
 import { Input, Textarea } from '../common/Input';
@@ -49,7 +50,13 @@ export const Step6Projects: React.FC = () => {
   const projectErrors = errors.projects || {};
 
   const handleInputChange = (field: keyof Project, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    const sanitizedValue =
+      field === 'name' || field === 'role'
+        ? sanitizeText(value)
+        : field === 'codeRepositoryUrl' || field === 'liveDemoUrl'
+          ? sanitizeUrl(value)
+          : value;
+    setFormData((prev) => ({ ...prev, [field]: sanitizedValue }));
     if (editingId) {
       clearError('projects', field);
     }
@@ -74,10 +81,24 @@ export const Step6Projects: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate required fields
+    const nameValidation = validateName(formData.name);
+    if (!nameValidation.valid) {
+      return;
+    }
+
+    // Sanitize rich text content before saving
+    const sanitizedData: Project = {
+      ...formData,
+      description: sanitizeHtml(formData.description || ''),
+      technicalArchitecture: sanitizeHtml(formData.technicalArchitecture || ''),
+    };
+
     if (editingId) {
-      updateProject(editingId, formData);
+      updateProject(editingId, sanitizedData);
     } else {
-      addProject({ ...formData, id: uuidv4() });
+      addProject({ ...sanitizedData, id: uuidv4() });
     }
     resetForm();
   };
