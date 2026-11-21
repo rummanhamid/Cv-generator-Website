@@ -161,9 +161,9 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
 
     const handleLinkSubmit = useCallback(() => {
       if (!editor || !linkUrl.trim()) return;
-      let url = linkUrl.trim();
+      const url = linkUrl.trim();
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        url = 'https://' + url;
+        return;
       }
       editor.chain().focus().setLink({ href: url }).run();
       setLinkUrl('');

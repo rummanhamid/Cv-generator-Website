@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify';
 import React, { useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -437,7 +438,9 @@ export const Step4Experience: React.FC = () => {
                               </strong>
                               <div
                                 className="prose prose-sm dark:prose-invert mt-1 max-w-none"
-                                dangerouslySetInnerHTML={{ __html: exp.achievements }}
+                                dangerouslySetInnerHTML={{
+                                  __html: DOMPurify.sanitize(exp.achievements || ''),
+                                }}
                               />
                             </div>
                           )}
@@ -448,7 +451,9 @@ export const Step4Experience: React.FC = () => {
                               </strong>
                               <div
                                 className="prose prose-sm dark:prose-invert mt-1 max-w-none"
-                                dangerouslySetInnerHTML={{ __html: exp.description }}
+                                dangerouslySetInnerHTML={{
+                                  __html: DOMPurify.sanitize(exp.description || ''),
+                                }}
                               />
                             </div>
                           )}

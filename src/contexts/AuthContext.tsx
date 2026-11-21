@@ -28,8 +28,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await signInWithEmailAndPassword(auth, email, password);
   };
 
+  const STORAGE_KEY = 'cv-form-data';
+
   const logout = async () => {
     await signOut(auth);
+    sessionStorage.removeItem(STORAGE_KEY);
   };
 
   return (

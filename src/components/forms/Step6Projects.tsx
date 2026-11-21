@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify';
 import React, { useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -339,7 +340,9 @@ Monitoring: Datadog, ELK Stack, Prometheus/Grafana"
                       {project.description && (
                         <div
                           className="prose prose-sm dark:prose-invert mt-3 line-clamp-3 max-w-none text-slate-600 dark:text-slate-400"
-                          dangerouslySetInnerHTML={{ __html: project.description }}
+                          dangerouslySetInnerHTML={{
+                            __html: DOMPurify.sanitize(project.description || ''),
+                          }}
                         />
                       )}
                       {project.technicalArchitecture && (
